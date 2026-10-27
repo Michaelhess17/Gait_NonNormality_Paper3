@@ -11,12 +11,13 @@
 # the two Figure 6 runs.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-JULIA="${JULIA:-./scripts/julia-env}"
+JULIA="${JULIA:-julia}"           # on Nix systems: JULIA=./scripts/julia-env
 run() { echo ">> $*"; "$JULIA" --project=. "$@"; }
 
 run scripts/01_pipeline_schematic.jl
 run scripts/02_benchmark_oscillators.jl
 run scripts/03_slip_locomotor_intuition.jl
+[ -d external/loco_mujoco_mocap/processed ] || external/loco_mujoco_mocap/fetch_and_convert.sh
 run scripts/04_bipedal_joint_structure.jl
 
 export GAIT_STRIDE_RESCALE=true GAIT_RIDGE_ALPHA=1e-4

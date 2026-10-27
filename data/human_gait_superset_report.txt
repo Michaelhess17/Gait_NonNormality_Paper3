@@ -1,0 +1,35 @@
+Human gait unique-trial superset build report
+=============================================
+
+HealthyYoungAdultStudy repo: /tmp/GaitSignatures_HealthyYoungAdultStudy @ 6f6917b8cbb3e399f9c02af4d70ca99c3f243455
+PostStrokeGaitBiomechanics repo: /tmp/GaitSignatures_PostStrokeGaitBiomechanics @ 0753beb25761e50de6af155e33db818c048c4926
+Original gait_signatures repo: /tmp/gait_signatures @ c5dff749a831d0c9c7a4ddd6fc32106694dc69c1
+Legacy local cache for omitted HYA raw trajectories: /home/michael/Documents/Gait_NonNormality_Paper/data
+
+Candidate DMD-ready trajectory counts:
+  GaitSignatures_HealthyYoungAdultStudy: 150
+  GaitSignatures_PostStrokeGaitBiomechanics: 149
+  gait_signatures: 72
+  total candidates: 371
+
+Duplicate RMS threshold: 0.75
+Duplicate second/best RMS margin threshold: 10.0
+Exact rounded content-hash duplicates: 0
+Skipped numeric duplicates: 72
+Skipped duplicate nearest RMS: min=0.0802692, median=0.201022, max=0.448361
+Skipped duplicate second/best RMS ratio: min=19.7683, median=49.6468, max=166.079
+
+Kept unique trials by source:
+  GaitSignatures_HealthyYoungAdultStudy: 150
+  GaitSignatures_PostStrokeGaitBiomechanics: 149
+  gait_signatures: 0
+Skipped duplicates by source:
+  GaitSignatures_HealthyYoungAdultStudy: 0
+  GaitSignatures_PostStrokeGaitBiomechanics: 0
+  gait_signatures: 72
+
+Unique dataset shape: (299, 1500, 6)
+
+Notes:
+  The public HYA repository lists 150 trials but omits the raw trajectory CSV files; those trajectories are matched from the existing local legacy cache.
+  PostStrokeGaitBiomechanics contains all 72 original gait_signatures public trajectories plus additional AB/ST trials, so PostStroke is kept preferentially.

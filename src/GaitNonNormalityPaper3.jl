@@ -28,7 +28,7 @@ export ROOT, FIG_DIR, RESULTS_DIR, SLIP_REPO_ROOT, PAPER_FONT_SIZE,
 const ROOT = normpath(joinpath(@__DIR__, ".."))
 const FIG_DIR = joinpath(ROOT, "figures")
 const RESULTS_DIR = joinpath(ROOT, "results")
-const SLIP_REPO_ROOT = normpath(get(ENV, "SLIP_REPO_ROOT", joinpath(ROOT, "external", "SLIP.jl")))
+const SLIP_REPO_ROOT = normpath(get(ENV, "SLIP_REPO_ROOT", joinpath(ROOT, "vendor", "SLIP.jl")))
 const PAPER_FONT_SIZE = 22
 const PAPER_TITLE_SIZE = 24
 const PAPER_LABEL_SIZE = 22

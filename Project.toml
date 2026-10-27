@@ -18,8 +18,8 @@ SLIP = "3f6b1e77-3d3a-4f2e-9b7d-1e3c8d0a5f21"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
 [sources]
-DMDAnalysis = {path = "../DMDAnalysis"}
-SLIP = {path = "external/SLIP.jl"}
+DMDAnalysis = {url = "https://github.com/Michaelhess17/DMDAnalysis.git", rev = "e5d047a2c983be97e9247de861b06e07b3b274d1"}
+SLIP = {path = "vendor/SLIP.jl"}
 
 [compat]
 FFTW = "1.10.0"

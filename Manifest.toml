@@ -390,7 +390,9 @@ version = "4.2.0"
 
 [[deps.DMDAnalysis]]
 deps = ["CSV", "DataFrames", "Dates", "DrWatson", "FFTW", "LinearAlgebra", "Random", "SHA", "Serialization", "Statistics"]
-path = "../DMDAnalysis"
+git-tree-sha1 = "543468855c588634450ba8b0c03cc29eec4123b2"
+repo-rev = "e5d047a2c983be97e9247de861b06e07b3b274d1"
+repo-url = "https://github.com/Michaelhess17/DMDAnalysis.git"
 uuid = "d2f9d85d-8fdc-483c-b9e9-6ef1e89f7cfb"
 version = "0.1.0"
 
@@ -856,7 +858,7 @@ uuid = "46192b85-c4d5-4398-a991-12ede77f4527"
 version = "0.2.0"
 
 [[deps.GaitNonNormalityPaper3]]
-deps = ["CSV", "CairoMakie", "DMDAnalysis", "DataFrames", "LaTeXStrings", "LinearAlgebra", "NPZ", "OrdinaryDiffEq", "ProgressMeter", "SLIP", "Statistics"]
+deps = ["CSV", "CairoMakie", "DMDAnalysis", "DataFrames", "FFTW", "LaTeXStrings", "LinearAlgebra", "NPZ", "OrdinaryDiffEq", "ProgressMeter", "SLIP", "Statistics"]
 path = "."
 uuid = "7d3efb1f-c903-4da3-86fe-0d7d7ca7e6cf"
 version = "0.1.0"
@@ -1657,9 +1659,9 @@ version = "2.4.1"
 
 [[deps.OrdinaryDiffEqCore]]
 deps = ["ADTypes", "Accessors", "Adapt", "ArrayInterface", "BinaryHeaps", "CommonSolve", "ConstructionBase", "DiffEqBase", "DocStringExtensions", "EnumX", "EnzymeCore", "FastBroadcast", "FastClosures", "FastPower", "FindFirstFunctions", "FunctionWrappers", "FunctionWrappersWrappers", "InteractiveUtils", "LinearAlgebra", "Logging", "MacroTools", "MuladdMacro", "PrecompileTools", "Preferences", "Printf", "Random", "RecursiveArrayTools", "Reexport", "SciMLBase", "SciMLLogging", "SciMLOperators", "SciMLStructures", "SymbolicIndexingInterface", "TruncatedStacktraces"]
-git-tree-sha1 = "53a0a4c674bda0829db08412b31e13285ee0f76b"
+git-tree-sha1 = "5433c3d682df140a32377242b7524b74555ca899"
 uuid = "bbf590c4-e513-4bbe-9b18-05decba2e5d8"
-version = "4.13.0"
+version = "4.14.1"
 
     [deps.OrdinaryDiffEqCore.extensions]
     OrdinaryDiffEqCoreMooncakeExt = "Mooncake"
@@ -1679,9 +1681,9 @@ version = "2.4.3"
 
 [[deps.OrdinaryDiffEqDifferentiation]]
 deps = ["ADTypes", "ArrayInterface", "ConcreteStructs", "ConstructionBase", "DiffEqBase", "DifferentiationInterface", "FastBroadcast", "FiniteDiff", "ForwardDiff", "FunctionWrappersWrappers", "LinearAlgebra", "LinearSolve", "OrdinaryDiffEqCore", "SciMLBase", "SciMLOperators", "SparseMatrixColorings", "StaticArraysCore"]
-git-tree-sha1 = "d9d3cc8c585a8698548a9a7349590ac0455936ea"
+git-tree-sha1 = "3a51475ae4dbf309d2e23f6a433e74ce582761e8"
 uuid = "4302a76b-040a-498a-8c04-15b101fed76b"
-version = "3.7.0"
+version = "3.9.0"
 weakdeps = ["SparseArrays"]
 
     [deps.OrdinaryDiffEqDifferentiation.extensions]
@@ -2050,7 +2052,7 @@ version = "3.7.2"
 
 [[deps.SLIP]]
 deps = ["CSV", "Contour", "DMDAnalysis", "DataFrames", "DecisionTree", "DiffEqBase", "LinearAlgebra", "OrdinaryDiffEq", "Statistics"]
-path = "external/SLIP.jl"
+path = "vendor/SLIP.jl"
 uuid = "3f6b1e77-3d3a-4f2e-9b7d-1e3c8d0a5f21"
 version = "0.1.0"
 

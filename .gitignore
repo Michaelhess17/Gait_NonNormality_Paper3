@@ -5,9 +5,23 @@
 __pycache__/
 *.pyc
 
-# Inputs that are large, external, or contain participant data (not redistributed)
-data/
-external/
+# Inputs. Tracked: the human gait trajectories (built from the public
+# GaitSignatures repositories) and the robot-mocap fetch/convert scripts.
+# Not tracked: participant clinical data, the CC-BY-NC-ND mocap files themselves,
+# the old vendored SLIP checkout (now vendor/SLIP.jl), reference PDFs.
+data/*
+!data/human_gait_superset.npy
+!data/human_gait_superset_metadata.csv
+!data/human_gait_superset_report.txt
+!data/human_gait_superset_github_nearest_matches.csv
+!data/human_gait_superset_github_skipped_duplicates.csv
+!data/human_gait_superset_skipped_duplicates.csv
+external/*
+!external/loco_mujoco_mocap/
+external/loco_mujoco_mocap/*
+!external/loco_mujoco_mocap/convert_to_csv.py
+!external/loco_mujoco_mocap/fetch_and_convert.sh
+!external/loco_mujoco_mocap/make_kinematics_video.py
 
 # Generated caches: every script rebuilds its own CSVs under results/
 results/*
