@@ -1,0 +1,27 @@
+name = "GaitNonNormalityPaper3"
+uuid = "7d3efb1f-c903-4da3-86fe-0d7d7ca7e6cf"
+version = "0.1.0"
+authors = ["Michael Hess"]
+
+[deps]
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+DMDAnalysis = "d2f9d85d-8fdc-483c-b9e9-6ef1e89f7cfb"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
+LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+NPZ = "15e1cf62-19b3-5cfa-8e77-841668bca605"
+OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
+ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
+SLIP = "3f6b1e77-3d3a-4f2e-9b7d-1e3c8d0a5f21"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+
+[sources]
+DMDAnalysis = {path = "../DMDAnalysis"}
+SLIP = {path = "external/SLIP.jl"}
+
+[compat]
+FFTW = "1.10.0"
+NPZ = "0.4.3"
+OrdinaryDiffEq = "7.3.0"

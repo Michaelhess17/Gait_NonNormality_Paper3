@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+julia_bin="${JULIA_BIN:-$(command -v julia)}"
+julia_bindir="$(dirname "$julia_bin")"
+julia_libdir="${JULIA_LIBDIR:-$julia_bindir/../lib/julia}"
+
+gfortran_libdir="${GFORTRAN_LIBDIR:-}"
+if [[ -z "$gfortran_libdir" ]]; then
+  while IFS= read -r candidate; do
+    gfortran_libdir="$(dirname "$candidate")"
+    break
+  done < <(find /nix/store -path '*/lib/libgfortran.so.5' 2>/dev/null)
+fi
+
+ld_parts=("$julia_libdir")
+if [[ -n "$gfortran_libdir" ]]; then
+  ld_parts+=("$gfortran_libdir")
+fi
+if [[ -n "${LD_LIBRARY_PATH:-}" ]]; then
+  ld_parts+=("$LD_LIBRARY_PATH")
+fi
+
+depot_path="${JULIA_DEPOT_PATH:-$repo_root/.julia_depot}"
+mkdir -p "$depot_path"
+
+export JULIA_DEPOT_PATH="$depot_path"
+export LD_LIBRARY_PATH="$(IFS=:; printf '%s' "${ld_parts[*]}")"
+
+exec "$julia_bin" "$@"

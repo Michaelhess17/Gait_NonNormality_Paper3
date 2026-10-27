@@ -1,0 +1,27 @@
+# Local Julia depot and tool state
+.julia_depot/
+.agents/
+.codex/
+__pycache__/
+*.pyc
+
+# Inputs that are large, external, or contain participant data (not redistributed)
+data/
+external/
+
+# Generated caches: every script rebuilds its own CSVs under results/
+results/*
+!results/.gitkeep
+
+# Figures: only the paper figures are tracked
+figures/*
+!figures/.gitkeep
+!figures/Figure [1-7].svg
+!figures/S60_ridge_sweep.png
+
+# Archived supplemental analyses, notes and backups (kept locally only)
+archive/
+
+# Office lock files
+.~lock.*
+~$*
