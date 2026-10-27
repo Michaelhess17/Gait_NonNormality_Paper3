@@ -801,66 +801,67 @@ function make_figure4()
     end
     rowgap!(glE, 4)
 
-    # F/G: H1 vs Atlas on their shared joints. The shared 10x10 map is rank one
-    # (see above), so the comparison is between the two robots' reception and
-    # drive profiles -- 10 + 10 numbers -- not 100 independent pathways.
-    axF = Axis(fig[3, 1:3], title="Shared joints: H1 vs Atlas profiles",
-        xlabel="H1 weight", ylabel="Atlas weight")
+    # F/G: each robot's rank-one profiles against H1's, on the shared ten-joint
+    # set used in panel E. Showing both Atlas and G1 lets the reader check which
+    # pair is actually more similar rather than taking one comparison on trust.
+    axF = Axis(fig[3, 1:3], title="Profiles relative to H1",
+        xlabel="H1 weight", ylabel="Atlas or G1 weight")
     panel_label!(fig, (3, 1), "F")
-    axG = Axis(fig[3, 4:6], title="Profile differences (Atlas − H1)",
-        xlabel="weight difference", ylabel="",
-        subtitle="red: Atlas higher · blue: H1 higher · dark: reception · light: drive")
+    axG = Axis(fig[3, 4:6], title="Profile differences from H1",
+        xlabel="weight difference (robot − H1)", ylabel="",
+        subtitle="dark: reception · light: drive")
     panel_label!(fig, (3, 4), "G")
     corr_rows = NamedTuple[]
-    if !isempty(shared_labels)
-        Mh1 = shared_io_matrix(io_mats, mech_data, "UnitreeH1", shared_labels)
-        Matlas = shared_io_matrix(io_mats, mech_data, "Atlas", shared_labels)
-        if Mh1 !== nothing && Matlas !== nothing
-            function rank_one_profiles(M)
-                F = svd(M)
-                u = abs.(F.U[:, 1]); v = abs.(F.V[:, 1])
-                return u ./ sum(u), v ./ sum(v)
-            end
-            rec_h, drv_h = rank_one_profiles(Mh1)
-            rec_a, drv_a = rank_one_profiles(Matlas)
-            r_rec = robust_cor(rec_h, rec_a)
-            r_drv = robust_cor(drv_h, drv_a)
-            names = [get(PRETTY_DOF, l, l) for l in shared_labels]
-            n = length(names)
+    others = [r for r in ("Atlas", "UnitreeG1") if haskey(robot_vecs, r)]
+    if haskey(robot_vecs, "UnitreeH1") && !isempty(others)
+        names = comparable_tick_labels("UnitreeH1")
+        n = length(names)
+        rec_h, drv_h = robot_vecs["UnitreeH1"].sink, robot_vecs["UnitreeH1"].source
+        short = Dict("Atlas" => "Atlas", "UnitreeG1" => "G1")
 
-            # --- F: every joint's weight in each robot, against the identity line.
-            allv = vcat(rec_h, rec_a, drv_h, drv_a)
-            hi = maximum(allv) * 1.08
-            lines!(axF, [0, hi], [0, hi]; color=(:black, 0.45), linestyle=:dash, linewidth=1.5)
-            scatter!(axF, rec_h, rec_a; color=GRAY, markersize=13, label="reception")
-            scatter!(axF, drv_h, drv_a; color=:white, strokecolor=GRAY, strokewidth=1.8,
-                marker=:rect, markersize=12, label="drive")
-            limits!(axF, 0, hi, 0, hi)
-            text!(axF, 0.04, 0.97;
-                text=@sprintf("reception r = %.2f\ndrive r = %.2f  (n = %d joints)", r_rec, r_drv, n),
-                space=:relative, align=(:left, :top), fontsize=13, font=:bold)
-            axislegend(axF; position=:rb, framevisible=false, labelsize=12)
+        # --- F: every joint's weight in each robot, against the identity line.
+        hi = 1.08 * maximum(vcat(rec_h, drv_h, [vcat(robot_vecs[r].sink, robot_vecs[r].source) for r in others]...))
+        lines!(axF, [0, hi], [0, hi]; color=(:black, 0.45), linestyle=:dash, linewidth=1.5)
+        stats = String[]
+        for r in others
+            rec, drv = robot_vecs[r].sink, robot_vecs[r].source
+            scatter!(axF, rec_h, rec; color=ROBOT_COLORS[r], markersize=13, label="$(short[r]) reception")
+            scatter!(axF, drv_h, drv; color=:white, strokecolor=ROBOT_COLORS[r], strokewidth=1.8,
+                marker=:rect, markersize=12, label="$(short[r]) drive")
+            push!(stats, @sprintf("H1 vs %s: reception r = %.2f, drive r = %.2f",
+                short[r], robust_cor(rec_h, rec), robust_cor(drv_h, drv)))
+        end
+        limits!(axF, 0, hi, 0, hi)
+        text!(axF, 0.04, 0.97; text=join(stats, "\n"), space=:relative, align=(:left, :top),
+            fontsize=13, font=:bold)
+        axislegend(axF; position=:rb, framevisible=false, labelsize=12)
 
-            # --- G: signed differences per joint, reception dark and drive light.
-            d_rec = rec_a .- rec_h
-            d_drv = drv_a .- drv_h
-            ys = 1:n
-            vlines!(axG, [0.0]; color=(:black, 0.35), linewidth=1)
-            barplot!(axG, ys .- 0.19, d_rec; direction=:x, width=0.36,
-                color=[d >= 0 ? RED : BLUE for d in d_rec], label="reception")
-            barplot!(axG, ys .+ 0.19, d_drv; direction=:x, width=0.36,
-                color=[(d >= 0 ? RED : BLUE, 0.35) for d in d_drv], label="drive")
-            axG.yticks = (ys, names)
-            axG.yticklabelsize = 11
-            axG.yreversed = true
-            xmax = maximum(abs, vcat(d_rec, d_drv))
-            xlims!(axG, -1.18xmax, 1.18xmax)
-            for j in 1:n
-                push!(corr_rows, (joint=shared_labels[j],
-                    reception_h1=rec_h[j], reception_atlas=rec_a[j],
-                    drive_h1=drv_h[j], drive_atlas=drv_a[j],
-                    reception_r=r_rec, drive_r=r_drv))
-            end
+        # --- G: signed differences from H1, per joint; one colour per robot.
+        ys = 1:n
+        vlines!(axG, [0.0]; color=(:black, 0.35), linewidth=1)
+        w = 0.19
+        for (k, r) in enumerate(others)
+            off = (k - 1) * 2w
+            barplot!(axG, ys .- 1.5w .+ off, robot_vecs[r].sink .- rec_h; direction=:x, width=w,
+                color=ROBOT_COLORS[r], label="$(short[r]) reception")
+            barplot!(axG, ys .- 0.5w .+ off, robot_vecs[r].source .- drv_h; direction=:x, width=w,
+                color=(ROBOT_COLORS[r], 0.35), label="$(short[r]) drive")
+        end
+        axG.yticks = (ys, names)
+        axG.yticklabelsize = 11
+        axG.yreversed = true
+        xlims!(axG, -0.25, 0.25)                # same scale as the weights in panel E
+        axislegend(axG; position=:rb, framevisible=false, labelsize=11)
+        for j in 1:n
+            push!(corr_rows, (joint=names[j], reception_h1=rec_h[j], drive_h1=drv_h[j],
+                reception_atlas=robot_vecs["Atlas"].sink[j], drive_atlas=robot_vecs["Atlas"].source[j],
+                reception_g1=robot_vecs["UnitreeG1"].sink[j], drive_g1=robot_vecs["UnitreeG1"].source[j],
+                reception_r_atlas=robust_cor(rec_h, robot_vecs["Atlas"].sink),
+                drive_r_atlas=robust_cor(drv_h, robot_vecs["Atlas"].source),
+                reception_r_g1=robust_cor(rec_h, robot_vecs["UnitreeG1"].sink),
+                drive_r_g1=robust_cor(drv_h, robot_vecs["UnitreeG1"].source),
+                reception_r_atlas_g1=robust_cor(robot_vecs["Atlas"].sink, robot_vecs["UnitreeG1"].sink),
+                drive_r_atlas_g1=robust_cor(robot_vecs["Atlas"].source, robot_vecs["UnitreeG1"].source)))
         end
     end
 
@@ -886,7 +887,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     CSV.write(joinpath(RESULTS_DIR, "figure4_bootstrap_metrics.csv"), metrics_df)
     CSV.write(joinpath(RESULTS_DIR, "figure4_horizon_curves.csv"), horizon_df)
     if nrow(corr_df) > 0
-        CSV.write(joinpath(RESULTS_DIR, "figure4_h1_atlas_shared_io_pathways.csv"), corr_df)
+        CSV.write(joinpath(RESULTS_DIR, "figure4_robot_profile_comparison.csv"), corr_df)
     end
     println("Figure 4 bootstrap metric rows: ", nrow(metrics_df))
 end

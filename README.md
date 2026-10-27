@@ -5,7 +5,7 @@ Analysis and figure code for the manuscript on delay-embedded DMD as a
 growth and resolvent structure across benchmark oscillators, SLIP, bipedal
 robots, able-bodied walkers and stroke survivors.
 
-The current manuscript is `draft/draft_v2.docx`; its figures are in `figures/`.
+The current manuscript is `draft/draft.docx`; its figures are in `figures/`.
 
 ## Quick start
 
@@ -43,7 +43,7 @@ no scores to correlate against. Everything else runs from the clone alone.
 ## What is in the repository
 
 ```text
-draft/draft_v2.docx             current manuscript
+draft/draft.docx                current manuscript
 figures/                        paper figures (Figs 1-7 as SVG, S60 ridge sweep)
 scripts/01-07_*.jl              one script per manuscript figure
 scripts/S60_ridge_sweep*.jl     Supplementary: sensitivity to ridge strength and rank

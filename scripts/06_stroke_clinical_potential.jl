@@ -726,22 +726,35 @@ function compute_or_load_profiles_and_io(trials, meta)
     return profiles, io
 end
 
-function scatter_metric!(ax, df, col)
-    rng = MersenneTwister(606)
+# Trial points by group, each subject's mixed-model line (thin), and each
+# group's population line with its 95% band (thick), drawn only over the speeds
+# that group actually walked at -- the AB and LF speed ranges do not overlap,
+# so extending the lines would present an extrapolation as data. Model:
+# y ~ group * log2(speed) + (1 + log2(speed) | subject); see src/.
+function mixed_metric!(ax, df, col)
+    res = speed_mixed_model(df, col; grouped=true)
+    pop, subj = mixed_model_lines(res)
     for group in GROUP_ORDER
         sub = df[df.group .== group, :]
         isempty(sub) && continue
         color = GROUP_COLORS[group]
-        # Matched to Figure 5's scatters. The old AB styling (alpha 0.22,
-        # markersize 5) made able-bodied points effectively invisible.
-        scatter!(ax, sub.speed, sub[!, col]; color=(color, 0.80), markersize=9,
+        scatter!(ax, sub.speed, sub[!, col]; color=(color, 0.55), markersize=8,
             marker=GROUP_MARKERS[group], label=group)
-        for ssub in groupby(sub, :subject)
-            ord = sortperm(ssub.speed)
-            lines!(ax, ssub.speed[ord], ssub[ord, col]; color=(color, 0.25), linewidth=1.0)
-        end
     end
+    for s in groupby(subj, :subject)
+        lines!(ax, s.speed, s.fit; color=(GROUP_COLORS[first(s.group)], 0.45), linewidth=1.2)
+    end
+    for g in groupby(pop, :group)
+        color = GROUP_COLORS[first(g.group)]
+        band!(ax, g.speed, g.lo, g.hi; color=(color, 0.18))
+        lines!(ax, g.speed, g.fit; color=color, linewidth=3.4)
+    end
+    text!(ax, 0.97, 0.96; space=:relative, align=(:right, :top), fontsize=13,
+        text=@sprintf("group p = %s\nspeed p = %s", pstr(res.p_group), pstr(res.p_speed)))
+    return res
 end
+
+pstr(p) = p < 1e-3 ? @sprintf("%.0e", p) : @sprintf("%.2g", p)
 
 function io_matrix_from_df(io, group)
     M = fill(NaN, 6, 6)
@@ -1272,14 +1285,15 @@ function make_figure6()
 
     fig = Figure(size=(1680, 2184), fontsize=PAPER_FONT_SIZE)
 
+    lmm_fits = Tuple{Symbol,Any}[]
     glA = GridLayout(fig[1, 1:3])
     panel_label!(fig, (1, 1), "A")
     axA1 = Axis(glA[1, 1], title="Non-normality", xlabel="speed", ylabel="Henrici")
     axA2 = Axis(glA[1, 2], title="Transient growth", xlabel="speed", ylabel=L"\log_{10}\max_k \|A^k\|_2")
     axA3 = Axis(glA[1, 3], title="Effective dimensionality", xlabel="speed", ylabel="participation")
-    scatter_metric!(axA1, metrics, :henrici)
-    scatter_metric!(axA2, metrics, :log_tgmax)
-    scatter_metric!(axA3, metrics, :participation)
+    push!(lmm_fits, (:henrici, mixed_metric!(axA1, metrics, :henrici)))
+    push!(lmm_fits, (:log_tgmax, mixed_metric!(axA2, metrics, :log_tgmax)))
+    push!(lmm_fits, (:participation, mixed_metric!(axA3, metrics, :participation)))
     axislegend(axA1; position=:lt, framevisible=false)
 
     axB = Axis(fig[2, 1:2], title="Group mean resolvent profiles",
@@ -1299,7 +1313,7 @@ function make_figure6()
 
     axC = Axis(fig[2, 3], title="Q-factor", xlabel="speed", ylabel="log₁₀ Q-factor")
     panel_label!(fig, (2, 3), "C")
-    scatter_metric!(axC, metrics, :log_q_factor)
+    push!(lmm_fits, (:log_q_factor, mixed_metric!(axC, metrics, :log_q_factor)))
     # log scale: on the phase grid the stride peak is very sharp and Q spans
     # two decades, so a linear axis with a cap hides most of the spread.
 
@@ -1414,6 +1428,7 @@ function make_figure6()
     rowgap!(fig.layout, 18)
     colgap!(fig.layout, 18)
     rowsize!(fig.layout, 5, Relative(0.26))   # panel I lost its speed row
+    CSV.write(joinpath(RESULTS_DIR, "figure6_speed_mixed_models_$(DMD_CONFIG_TAG).csv"), mixed_model_summary(lmm_fits))
     savefig("Figure 6.svg", fig)
     return fig
 end

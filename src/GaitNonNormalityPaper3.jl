@@ -7,6 +7,9 @@ using NPZ
 using Statistics
 using DMDAnalysis
 using LinearAlgebra
+import MixedModels
+using MixedModels: MixedModel, @formula, DummyCoding, VarCorr, varest, fixef, vcov,
+    coefnames, modelmatrix, raneftables, coeftable
 
 export ROOT, FIG_DIR, RESULTS_DIR, SLIP_REPO_ROOT, PAPER_FONT_SIZE,
     PAPER_TITLE_SIZE, PAPER_LABEL_SIZE, PAPER_TICK_SIZE,
@@ -23,7 +26,8 @@ export ROOT, FIG_DIR, RESULTS_DIR, SLIP_REPO_ROOT, PAPER_FONT_SIZE,
     JOINT_LABELS_PARETIC, JOINT_LABELS_AB, JOINT_LABELS_POOLED, joint_labels,
     LIMB_CONVENTION_NOTE,
     SOURCE_HYA, SOURCE_PSGB, SOURCE_ALL, SOURCE_TAGS, select_source,
-    with_velocity, posvel_io_matrix
+    with_velocity, posvel_io_matrix,
+    speed_mixed_model, mixed_model_lines, mixed_model_summary
 
 const ROOT = normpath(joinpath(@__DIR__, ".."))
 const FIG_DIR = joinpath(ROOT, "figures")
@@ -512,6 +516,130 @@ function clinical_score_mapping_report(meta_path=joinpath(ROOT, "data", "human_g
             row.docx_paretic_side == row.metadata_paretic_side for row in eachrow(report)]
     end
     return report
+end
+
+
+# ---------------------------------------------------------------------------
+# Speed mixed-effects models (Figures 5 and 6)
+#
+# Speed is a dynamical factor, not a nuisance: each measure is modelled as
+#   y ~ [group *] speed + (1 + speed | subject)
+# by maximum likelihood, with speed entering as log2(speed), centred, so slopes
+# are changes per doubling of speed. Log speed fits the young-adult data far
+# better than linear speed (AIC lower by 8-101 across measures; the measures
+# flatten above ~100 cm/s) and the stroke data equally well. Variance is
+# partitioned Nakagawa-style into fixed effects (var of X*beta), individuals
+# (mean over trials of z' Sigma z, z = [1, speed]) and residual. With a group
+# term, the fixed share is split into parts unique to group, unique to speed,
+# and shared (the drop in marginal R^2 when each term is removed).
+# ---------------------------------------------------------------------------
+function speed_mixed_model(df::AbstractDataFrame, col::Symbol; grouped::Bool=true)
+    d = DataFrame(y=Float64.(df[!, col]), speed=Float64.(df.speed),
+        subject=String.(df.subject), group=String.(df.group))
+    d = d[isfinite.(d.y) .& isfinite.(d.speed), :]
+    center = mean(log2.(d.speed))
+    d.spd = log2.(d.speed) .- center
+    grouped &= length(unique(d.group)) > 1
+    contr = grouped ? Dict(:group => DummyCoding(base=first(filter(in(unique(d.group)), GROUP_ORDER)))) : Dict{Symbol,Any}()
+    fitm(f) = MixedModels.fit(MixedModel, f, d; contrasts=contr, REML=false, progress=false)
+    fixvar(m) = var(modelmatrix(m) * fixef(m))
+    function ranvar(m)
+        s = VarCorr(m).σρ.subject
+        sd = collect(s.σ); rho = (isempty(s.ρ) || !isfinite(s.ρ[1])) ? 0.0 : s.ρ[1]
+        length(sd) == 1 && return sd[1]^2           # intercept-only comparison models
+        S = [sd[1]^2 rho*sd[1]*sd[2]; rho*sd[1]*sd[2] sd[2]^2]
+        Z = hcat(ones(nrow(d)), d.spd)
+        mean(sum((Z * S) .* Z; dims=2))
+    end
+    r2m(m) = (v = fixvar(m); v / (v + ranvar(m) + varest(m)))
+    lrt_p(small, big) = MixedModels.likelihoodratiotest(small, big).pval[2]
+    if grouped
+        full = fitm(@formula(y ~ 1 + group * spd + (1 + spd | subject)))
+        nogrp = fitm(@formula(y ~ 1 + spd + (1 + spd | subject)))
+        noint = fitm(@formula(y ~ 1 + group + spd + (1 + spd | subject)))
+        nospd = fitm(@formula(y ~ 1 + group + (1 | subject)))
+        p_group, p_speed, p_inter = lrt_p(nogrp, full), lrt_p(nospd, full), lrt_p(noint, full)
+        uniq_group = r2m(full) - r2m(nogrp); uniq_speed = r2m(full) - r2m(nospd)
+    else
+        full = fitm(@formula(y ~ 1 + spd + (1 + spd | subject)))
+        nospd = fitm(@formula(y ~ 1 + (1 | subject)))
+        noint = nothing
+        p_group, p_inter = NaN, NaN
+        p_speed = lrt_p(nospd, full)
+        uniq_group = 0.0; uniq_speed = r2m(full)
+    end
+    vf, vr, ve = fixvar(full), ranvar(full), varest(full); tot = vf + vr + ve
+    return (; model=full, additive=noint, data=d, center, grouped,
+        p_group, p_speed, p_inter,
+        share_fixed=vf / tot, share_group=uniq_group, share_speed=uniq_speed,
+        share_shared=vf / tot - uniq_group - uniq_speed,
+        share_subject=vr / tot, share_residual=ve / tot)
+end
+
+# Fixed-effect design row for one group at one centred speed, in the order of
+# the model's coefficients.
+function _design_row(m, group, spd)
+    map(coefnames(m)) do name
+        name == "(Intercept)" && return 1.0
+        name == "spd" && return spd
+        g = match(r"^group: (\w+)$", name)
+        g !== nothing && return Float64(g[1] == group)
+        gi = match(r"^group: (\w+) & spd$", name)
+        gi !== nothing && return Float64(gi[1] == group) * spd
+        error("unexpected coefficient $name")
+    end
+end
+
+"""Fitted lines from `speed_mixed_model`: a population line per group with a
+95% Wald band, drawn only over that group's recorded speeds, and one line per
+subject (fixed effects plus that subject's random intercept and slope), drawn
+over that subject's recorded speeds."""
+function mixed_model_lines(res; n=60)
+    m, d = res.model, res.data
+    V = vcov(m); beta = fixef(m)
+    groups = res.grouped ? [g for g in GROUP_ORDER if g in d.group] : [first(d.group)]
+    pop = NamedTuple[]
+    for g in groups
+        sp = res.grouped ? d.speed[d.group .== g] : d.speed
+        for s in range(minimum(sp), maximum(sp); length=n)
+            x = _design_row(m, g, log2(s) - res.center)
+            yhat = dot(x, beta); se = sqrt(max(dot(x, V * x), 0.0))
+            push!(pop, (group=g, speed=s, fit=yhat, lo=yhat - 1.96se, hi=yhat + 1.96se))
+        end
+    end
+    re = DataFrame(only(raneftables(m)))
+    subj = NamedTuple[]
+    for r in eachrow(re)
+        sub = d[d.subject .== r.subject, :]
+        g = first(sub.group)
+        for s in range(minimum(sub.speed), maximum(sub.speed); length=max(2, n ÷ 6))
+            spd = log2(s) - res.center
+            yhat = dot(_design_row(m, res.grouped ? g : first(d.group), spd), beta) + r[2] + r[3] * spd
+            push!(subj, (subject=String(r.subject), group=g, speed=s, fit=yhat))
+        end
+    end
+    return DataFrame(pop), DataFrame(subj)
+end
+
+
+"""One row per coefficient of each fitted model (full and, if grouped, additive)
+with the model-level p values and variance shares repeated on every row."""
+function mixed_model_summary(fits)
+    rows = NamedTuple[]
+    for (metric, res) in fits
+        for (label, m) in (("full", res.model), ("additive", res.additive))
+            m === nothing && continue
+            ct = coeftable(m)
+            for (name, b, se, p) in zip(coefnames(m), fixef(m), ct.cols[2], ct.cols[4])
+                push!(rows, (metric=String(metric), model=label, coef=name, estimate=b, se=se, p=p,
+                    p_group=res.p_group, p_speed=res.p_speed, p_interaction=res.p_inter,
+                    share_fixed=res.share_fixed, share_group=res.share_group, share_speed=res.share_speed,
+                    share_shared=res.share_shared, share_subject=res.share_subject,
+                    share_residual=res.share_residual, speed_center=res.center))
+            end
+        end
+    end
+    return DataFrame(rows)
 end
 
 end

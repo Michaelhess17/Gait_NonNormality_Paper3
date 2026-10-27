@@ -541,6 +541,32 @@ function scatter_metric!(ax, df, col)
     end
 end
 
+# Trial points in subject colours with each subject's mixed-model line (fixed
+# effect + that subject's random intercept and slope), and the population line
+# with its 95% band in black. Same model as Figure 6, without a group term.
+function mixed_metric!(ax, df, col)
+    res = speed_mixed_model(df, col; grouped=false)
+    pop, subj = mixed_model_lines(res)
+    subjects = sort(unique(String.(df.subject)))
+    palette = cgrad(:tab20, max(length(subjects), 3); categorical=true)
+    subject_colors = Dict(subject => palette[i] for (i, subject) in enumerate(subjects))
+    for sub in groupby(df, :subject)
+        color = subject_colors[String(first(sub.subject))]
+        scatter!(ax, sub.speed, sub[!, col]; color=(color, 0.55), markersize=8,
+            strokecolor=color, strokewidth=0.8)
+    end
+    for s in groupby(subj, :subject)
+        lines!(ax, s.speed, s.fit; color=(subject_colors[first(s.subject)], 0.9), linewidth=1.6)
+    end
+    band!(ax, pop.speed, pop.lo, pop.hi; color=(:black, 0.15))
+    lines!(ax, pop.speed, pop.fit; color=:black, linewidth=3.2)
+    text!(ax, 0.97, 0.96; space=:relative, align=(:right, :top), fontsize=13,
+        text=@sprintf("speed: %.0f%% of variance\np = %s", 100res.share_speed, pstr(res.p_speed)))
+    return res
+end
+
+pstr(p) = p < 1e-3 ? @sprintf("%.0e", p) : @sprintf("%.2g", p)
+
 function metric_slope_by_subject(df, col)
     rows = NamedTuple[]
     for sub in groupby(df, :subject)
@@ -807,7 +833,7 @@ function make_figure5()
     for x in (2.3, 4.9, 7.5)
         arrows!(axA, [x], [2.08], [0.85], [0]; arrowsize=16, linewidth=2, color=GRAY)
     end
-    text!(axA, 0.45, 1.16; text=@sprintf("%d able-bodied trials, %d subjects\nHealthy Young Adult study only",
+    text!(axA, 0.45, 1.16; text=@sprintf("%d able-bodied trials, %d subjects\nYoung Adult study only",
         length(ab_trials), length(unique(String.(ab_meta.subject)))),
         align=(:left, :top), fontsize=15, color=GRAY)
 
@@ -838,14 +864,15 @@ function make_figure5()
     lines!(axC, xh, pred_sum.phase_mean; color=GRAY, linewidth=2.5, linestyle=:dash, label="phase template")
     axislegend(axC; position=:lt, framevisible=false)
 
+    lmm_fits = Tuple{Symbol,Any}[]
     glD = GridLayout(fig[2, 1:3])
     panel_label!(fig, (2, 1), "D")
     axD1 = Axis(glD[1, 1], title="Non-normality", xlabel="speed", ylabel="Henrici")
     axD2 = Axis(glD[1, 2], title="Transient growth", xlabel="speed", ylabel=L"\log_{10}\max_k \|A^k\|_2")
     axD3 = Axis(glD[1, 3], title="Effective dimensionality", xlabel="speed", ylabel="participation")
-    scatter_metric!(axD1, metrics, :henrici)
-    scatter_metric!(axD2, metrics, :log_tgmax)
-    scatter_metric!(axD3, metrics, :participation)
+    push!(lmm_fits, (:henrici, mixed_metric!(axD1, metrics, :henrici)))
+    push!(lmm_fits, (:log_tgmax, mixed_metric!(axD2, metrics, :log_tgmax)))
+    push!(lmm_fits, (:participation, mixed_metric!(axD3, metrics, :participation)))
 
     axE = Axis(fig[3, 1], title="Trial-averaged resolvent profiles",
         xlabel="frequency / stride frequency", ylabel="resolvent gain", yscale=log10)
@@ -863,7 +890,7 @@ function make_figure5()
 
     axF = Axis(fig[3, 2], title="Q-factor", xlabel="speed", ylabel="log₁₀ Q-factor")
     panel_label!(fig, (3, 2), "F")
-    scatter_metric!(axF, metrics, :log_q_factor)
+    push!(lmm_fits, (:log_q_factor, mixed_metric!(axF, metrics, :log_q_factor)))
     # log scale: on the phase grid the stride peak is very sharp and Q spans
     # two decades, so a linear axis with a cap hides most of the spread.
 
@@ -898,8 +925,8 @@ function make_figure5()
     text!(axG, 0.98, 0.97; space=:relative, align=(:right, :top), fontsize=12, color=GRAY,
         text=@sprintf("rank one: %.1f%%", 100 * sv_all[1]^2 / sum(abs2, sv_all)))
 
-    # H: one panel per speed bin, in the Figure 6D-F convention, so the speed
-    # effect reads the same way as the group effect in Figure 6.
+    # H: one panel per joint with the three speed bins side by side, so the
+    # speed effect on each joint is read off directly instead of across panels.
     pathway_summary = sink_source_by_speed(resolvent_io)
     bin_vecs = Dict{String,Any}()
     for bin in ("slow", "middle", "fast")
@@ -911,16 +938,29 @@ function make_figure5()
     ylims!(axG, 0, vec_hi)
     glH = GridLayout(fig[4, 1:3])
     panel_label!(fig, (4, 1), "H")
-    for (k, bin) in enumerate(("slow", "middle", "fast"))
-        ax = Axis(glH[1, k], title="$(bin) walking: reception and drive",
-            xticklabelrotation=0.9, xlabel="joint", ylabel=(k == 1 ? "weight" : ""),
-            xticks=(1:6, JOINT_LABELS))
-        barplot!(ax, (1:6) .- 0.19, bin_vecs[bin].sink; color=BLUE, width=0.36, label="reception")
-        barplot!(ax, (1:6) .+ 0.19, bin_vecs[bin].source; color=(BLUE, 0.35), width=0.36, label="drive")
+    bins = ("slow", "middle", "fast")
+    bin_colors = Dict("slow" => BLUE, "middle" => GOLD, "fast" => RED)
+    # Channel order is [R hip, R knee, R ankle, L hip, L knee, L ankle].
+    for (k, joint) in enumerate(("hip", "knee", "ankle"))
+        idx = (k, k + 3)                                  # (R, L) channels
+        ax = Axis(glH[1, k], title=joint, ylabel=(k == 1 ? "weight" : ""),
+            xticks=(1:4, ["reception R", "reception L", "drive R", "drive L"]),
+            xticklabelrotation=0.5)
+        for (b, bin) in enumerate(bins)
+            v = bin_vecs[bin]
+            ys = [v.sink[idx[1]], v.sink[idx[2]], v.source[idx[1]], v.source[idx[2]]]
+            cols = [bin_colors[bin], bin_colors[bin], (bin_colors[bin], 0.4), (bin_colors[bin], 0.4)]
+            barplot!(ax, (1:4) .+ (b - 2) * 0.26, ys; color=cols, width=0.24, label=bin)
+        end
         ylims!(ax, 0, vec_hi)
-        text!(ax, 0.98, 0.97; space=:relative, align=(:right, :top), fontsize=12, color=GRAY,
-            text=@sprintf("rank one: %.1f%%", 100 * bin_vecs[bin].e1))
+        k > 1 && hideydecorations!(ax; grid=false)
+        k == 3 && axislegend(ax, [PolyElement(color=bin_colors[b]) for b in bins],
+            ["slow", "middle", "fast"], "walking speed"; position=:rt, framevisible=false,
+            labelsize=13, orientation=:horizontal, titleposition=:left)
     end
+    Label(glH[0, :], @sprintf("reception (dark) and drive (light) by joint and speed; rank one: %s",
+            join([@sprintf("%.1f%%", 100 * bin_vecs[b].e1) for b in bins], ", ")),
+        fontsize=13, color=GRAY)
     nrow(pathway_summary) > 0 &&
         CSV.write(joinpath(RESULTS_DIR, "figure5_speed_pathway_summary.csv"), pathway_summary)
 
@@ -929,6 +969,7 @@ function make_figure5()
     # Row 1 carries panel A's skeleton schematic; give it enough height that
     # the poses are not vertically compressed against the x scale.
     rowsize!(fig.layout, 1, Relative(0.28))
+    CSV.write(joinpath(RESULTS_DIR, "figure5_speed_mixed_models_$(DMD_CONFIG_TAG).csv"), mixed_model_summary(lmm_fits))
     savefig("Figure 5.svg", fig)
     return fig
 end

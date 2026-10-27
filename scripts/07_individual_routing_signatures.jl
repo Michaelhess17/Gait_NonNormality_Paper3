@@ -354,7 +354,7 @@ function make_figure7()
             color=ds == "HYA" ? (GROUP_COLORS[g], 0.75) : (:white, 0.0),
             strokecolor=GROUP_COLORS[g], strokewidth=ds == "HYA" ? 0 : 2.4,
             marker=GROUP_MARKERS[g], markersize=15,
-            label="$g ($ds)")
+            label="$g ($(ds == "HYA" ? "YA" : ds))")
     end
     axislegend(axA; position=:lb, framevisible=false, labelsize=PAPER_LEGEND_SIZE, nbanks=2)
     text!(axA, 0.02, 0.97;
